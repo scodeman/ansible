@@ -5,11 +5,12 @@
 Using collections
 *****************
 
-Collections are a distribution format for Ansible content that can include playbooks, roles, modules, and plugins.
+Collections are a distribution format for Ansible content that can include playbooks, roles, modules, and plugins. As modules move from the core Ansible repository into collections, the module documentation will move to the `collections documentation page <https://docs.ansible.com/collections/>`_
+
 You can install and use collections through `Ansible Galaxy <https://galaxy.ansible.com>`_.
 
 * For details on how to *develop* collections see :ref:`developing_collections`.
-* For the current development status of Collections and FAQ see `Ansible Collections Community Guide <https://github.com/ansible-collections/general/blob/master/README.rst>`_.
+* For the current development status of Collections and FAQ see `Ansible Collections Community Guide <https://github.com/ansible-collections/overview/blob/master/README.rst>`_.
 
 .. contents::
    :local:
@@ -33,6 +34,11 @@ Installing an older version of a collection
 
 .. include:: ../shared_snippets/installing_older_collection.txt
 
+Installing a collection from a git repository
+---------------------------------------------
+
+.. include:: ../shared_snippets/installing_collections_git_repo.txt
+
 .. _collection_requirements_file:
 
 Install multiple collections with a requirements file
@@ -55,12 +61,66 @@ Configuring the ``ansible-galaxy`` client
 
 .. include:: ../shared_snippets/galaxy_server_list.txt
 
+.. _collections_downloading:
+
+Downloading collections
+=======================
+
+To download a collection and its dependencies for an offline install, run ``ansible-galaxy collection download``. This
+downloads the collections specified and their dependencies to the specified folder and creates a ``requirements.yml``
+file which can be used to install those collections on a host without access to a Galaxy server. All the collections
+are downloaded by default to the ``./collections`` folder.
+
+Just like the ``install`` command, the collections are sourced based on the
+:ref:`configured galaxy server config <galaxy_server_config>`. Even if a collection to download was specified by a URL
+or path to a tarball, the collection will be redownloaded from the configured Galaxy server.
+
+Collections can be specified as one or multiple collections or with a ``requirements.yml`` file just like
+``ansible-galaxy collection install``.
+
+To download a single collection and its dependencies:
+
+.. code-block:: bash
+
+   ansible-galaxy collection download my_namespace.my_collection
+
+To download a single collection at a specific version:
+
+.. code-block:: bash
+
+   ansible-galaxy collection download my_namespace.my_collection:1.0.0
+
+To download multiple collections either specify multiple collections as command line arguments as shown above or use a
+requirements file in the format documented with :ref:`collection_requirements_file`.
+
+.. code-block:: bash
+
+   ansible-galaxy collection download -r requirements.yml
+
+All the collections are downloaded by default to the ``./collections`` folder but you can use ``-p`` or
+``--download-path`` to specify another path:
+
+.. code-block:: bash
+
+   ansible-galaxy collection download my_namespace.my_collection -p ~/offline-collections
+
+Once you have downloaded the collections, the folder contains the collections specified, their dependencies, and a
+``requirements.yml`` file. You can use this folder as is with ``ansible-galaxy collection install`` to install the
+collections on a host without access to a Galaxy or Automation Hub server.
+
+.. code-block:: bash
+
+   # This must be run from the folder that contains the offline collections and requirements.yml file downloaded
+   # by the internet-connected host
+   cd ~/offline-collections
+   ansible-galaxy collection install -r requirements.yml
+
 .. _collections_listing:
 
 Listing collections
 ===================
 
-To list installed collections, run ``ansible-galaxy collection list``. This shows all of the installed collections found in the configured collections search paths. The path where the collections are located are displayed as well as version information. If no version information is available, a ``*`` is displayed for the version number.
+To list installed collections, run ``ansible-galaxy collection list``. This shows all of the installed collections found in the configured collections search paths. It will also show collections under development which contain a galaxy.yml file instead of a MANIFEST.json. The path where the collections are located are displayed as well as version information. If no version information is available, a ``*`` is displayed for the version number.
 
 .. code-block:: shell
 
@@ -70,7 +130,7 @@ To list installed collections, run ``ansible-galaxy collection list``. This show
       cisco.aci                  0.0.5
       cisco.mso                  0.0.4
       sandwiches.ham             *
-      splunk.enterprise_security 0.0.5
+      splunk.es                  0.0.5
 
       # /usr/share/ansible/collections/ansible_collections
       Collection        Version
@@ -120,7 +180,7 @@ To search other paths for collections, use the ``-p`` option. Specify multiple s
       cisco.mso                  0.0.4
       fortinet.fortios           1.0.1
       sandwiches.ham             *
-      splunk.enterprise_security 0.0.5
+      splunk.es                  0.0.5
 
       # /usr/share/ansible/collections/ansible_collections
       Collection        Version
@@ -179,6 +239,7 @@ In addition to the ``namespace.collection_name:version`` format, you can provide
 
 Verifying against ``tar.gz`` files is not supported. If your ``requirements.yml`` contains paths to tar files or URLs for installation, you can use the ``--ignore-errors`` flag to ensure that all collections using the ``namespace.name`` format in the file are processed.
 
+.. _collections_using_playbook:
 
 Using collections in a Playbook
 ===============================
@@ -237,7 +298,8 @@ In a playbook, you can control the collections Ansible searches for modules and 
 
      - hosts: all
        collections:
-        - my_namespace.my_collection
+         - my_namespace.my_collection
+
        tasks:
          - import_role:
              name: role1

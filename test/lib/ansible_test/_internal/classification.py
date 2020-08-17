@@ -288,9 +288,6 @@ class PathMapper:
         :type path: str
         :rtype: list[str]
         """
-        if path == 'lib/ansible/module_utils/__init__.py':
-            return []
-
         if not self.python_module_utils_imports:
             display.info('Analyzing python module_utils imports...')
             before = time.time()
@@ -611,6 +608,12 @@ class PathMapper:
                 FOCUSED_TARGET: target is not None,
             }
 
+        if is_subdir(path, data_context().content.plugin_paths['filter']):
+            return self._simple_plugin_tests('filter', name)
+
+        if is_subdir(path, data_context().content.plugin_paths['lookup']):
+            return self._simple_plugin_tests('lookup', name)
+
         if (is_subdir(path, data_context().content.plugin_paths['terminal']) or
                 is_subdir(path, data_context().content.plugin_paths['cliconf']) or
                 is_subdir(path, data_context().content.plugin_paths['netconf'])):
@@ -635,6 +638,9 @@ class PathMapper:
                     'units': 'all',
                 }
 
+        if is_subdir(path, data_context().content.plugin_paths['test']):
+            return self._simple_plugin_tests('test', name)
+
         return None
 
     def _classify_collection(self, path):  # type: (str) -> t.Optional[t.Dict[str, str]]
@@ -643,6 +649,14 @@ class PathMapper:
 
         if result is not None:
             return result
+
+        minimal = {}
+
+        if path.startswith('changelogs/'):
+            return minimal
+
+        if path.startswith('docs/'):
+            return minimal
 
         return None
 
@@ -755,26 +769,31 @@ class PathMapper:
         if path.startswith('test/lib/ansible_test/_internal/sanity/'):
             return {
                 'sanity': 'all',  # test infrastructure, run all sanity checks
+                'integration': 'ansible-test',  # run ansible-test self tests
             }
 
         if path.startswith('test/lib/ansible_test/_data/sanity/'):
             return {
                 'sanity': 'all',  # test infrastructure, run all sanity checks
+                'integration': 'ansible-test',  # run ansible-test self tests
             }
 
         if path.startswith('test/lib/ansible_test/_internal/units/'):
             return {
                 'units': 'all',  # test infrastructure, run all unit tests
+                'integration': 'ansible-test',  # run ansible-test self tests
             }
 
         if path.startswith('test/lib/ansible_test/_data/units/'):
             return {
                 'units': 'all',  # test infrastructure, run all unit tests
+                'integration': 'ansible-test',  # run ansible-test self tests
             }
 
         if path.startswith('test/lib/ansible_test/_data/pytest/'):
             return {
                 'units': 'all',  # test infrastructure, run all unit tests
+                'integration': 'ansible-test',  # run ansible-test self tests
             }
 
         if path.startswith('test/lib/ansible_test/_data/requirements/'):
@@ -868,6 +887,31 @@ class PathMapper:
                 return minimal
 
         return None  # unknown, will result in fall-back to run all tests
+
+    def _simple_plugin_tests(self, plugin_type, plugin_name):  # type: (str, str) -> t.Dict[str, t.Optional[str]]
+        """
+        Return tests for the given plugin type and plugin name.
+        This function is useful for plugin types which do not require special processing.
+        """
+        if plugin_name == '__init__':
+            return all_tests(self.args, True)
+
+        integration_target = self.integration_targets_by_name.get('%s_%s' % (plugin_type, plugin_name))
+
+        if integration_target:
+            integration_name = integration_target.name
+        else:
+            integration_name = None
+
+        units_path = os.path.join(data_context().content.unit_path, 'plugins', plugin_type, 'test_%s.py' % plugin_name)
+
+        if units_path not in self.units_paths:
+            units_path = None
+
+        return dict(
+            integration=integration_name,
+            units=units_path,
+        )
 
 
 def all_tests(args, force=False):
